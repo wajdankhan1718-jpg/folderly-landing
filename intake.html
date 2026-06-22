@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folderly — Client intake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#1B1B18; --paper:#FAF8F3; --paper-fold:#E8E2D4;
+    --rust:#C9622B; --rust-dark:#9C481D; --sage:#5B6B57; --sage-light:#EDF0EA;
+    --line:rgba(27,27,24,0.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:0 24px}
+  nav{display:flex;align-items:center;padding:24px 0;border-bottom:1px solid var(--line)}
+  .logo{font-family:'Fraunces',serif;font-weight:600;font-size:19px;display:flex;align-items:center;gap:8px}
+  .logo-mark{width:20px;height:20px;border:1.5px solid var(--ink);border-radius:3px;position:relative;flex-shrink:0}
+  .logo-mark::after{content:'';position:absolute;top:5px;left:4px;right:4px;height:1.5px;background:var(--ink)}
+  .logo-mark::before{content:'';position:absolute;bottom:5px;left:4px;width:7px;height:1.5px;background:var(--rust)}
+
+  .page-head{padding:36px 0 8px}
+  h1{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin-bottom:6px}
+  .sub{font-size:14px;color:#8a8a82;margin-bottom:28px}
+
+  .checklist{display:flex;gap:6px;margin-bottom:32px}
+  .check-step{flex:1;height:4px;background:var(--line);border-radius:3px;overflow:hidden}
+  .check-step.done{background:var(--sage)}
+
+  .section-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:24px;margin-bottom:18px}
+  .section-card h2{font-family:'Fraunces',serif;font-weight:500;font-size:17px;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+  .step-num{
+    width:24px;height:24px;border-radius:50%;background:var(--paper-fold);color:var(--rust-dark);
+    font-family:'IBM Plex Mono',monospace;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .step-num.complete{background:var(--sage);color:#fff}
+  .section-card p.desc{font-size:13px;color:#8a8a82;margin-bottom:16px;margin-left:34px}
+
+  .form-group{margin-bottom:14px;margin-left:34px}
+  label{display:block;font-size:12px;font-family:'IBM Plex Mono',monospace;color:#5a5a52;margin-bottom:6px}
+  input[type=text], input[type=email], textarea{
+    width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:5px;
+    font-size:14px;font-family:'Inter',sans-serif;color:var(--ink);outline:none;transition:border-color .15s;
+  }
+  textarea{min-height:80px;resize:vertical;font-family:'Inter',sans-serif}
+  input:focus, textarea:focus{border-color:var(--rust)}
+
+  .file-drop{
+    margin-left:34px;border:1.5px dashed var(--line);border-radius:6px;padding:24px;
+    text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--paper-fold);
+  }
+  .file-drop:hover{border-color:var(--rust);background:#fff}
+  .file-drop input{display:none}
+  .file-drop p{font-size:13px;color:#8a8a82}
+  .file-drop .file-name{font-size:13px;color:var(--sage);font-weight:500;margin-top:6px}
+
+  .btn-section{
+    margin-left:34px;margin-top:14px;background:var(--ink);color:#fff;border:none;border-radius:5px;
+    padding:10px 18px;font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer;transition:background .15s;
+  }
+  .btn-section:hover{background:#34342e}
+  .btn-section:disabled{opacity:.5;cursor:not-allowed}
+  .btn-section.done{background:var(--sage)}
+
+  .msg{margin-left:34px;margin-top:10px;padding:8px 12px;border-radius:5px;font-size:12px;display:none}
+  .msg.error{background:#fbe9e7;color:#a32d2d;display:block}
+  .msg.success{background:var(--sage-light);color:var(--sage);display:block}
+
+  .all-done{
+    text-align:center;padding:48px 24px;background:#fff;border:1px solid var(--line);border-radius:8px;
+  }
+  .all-done .icon{font-size:36px;margin-bottom:12px}
+  .all-done h2{font-family:'Fraunces',serif;font-weight:500;font-size:21px;margin-bottom:8px}
+  .all-done p{font-size:14px;color:#8a8a82}
+
+  .loading-screen{text-align:center;padding:80px 0;color:#8a8a82}
+  .footer-note{text-align:center;font-size:12px;color:#8a8a82;padding:30px 0;font-family:'IBM Plex Mono',monospace}
+
+  @media (max-width:560px){
+    .form-group, .file-drop, .btn-section, .msg, p.desc{margin-left:0}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <div class="logo"><span class="logo-mark"></span>Folderly</div>
+  </nav>
+
+  <div id="loadingScreen" class="loading-screen">Loading your onboarding checklist...</div>
+  <div id="invalidLink" class="loading-screen" style="display:none">This link looks invalid or has expired. Please check the link your freelancer sent you.</div>
+
+  <div id="intakeContent" style="display:none">
+    <div class="page-head">
+      <h1>Welcome, <span id="clientNameDisplay">there</span></h1>
+      <p class="sub">Complete the steps below — you can save your progress and come back anytime.</p>
+    </div>
+
+    <div class="checklist">
+      <div class="check-step" id="checkStep1"></div>
+      <div class="check-step" id="checkStep2"></div>
+      <div class="check-step" id="checkStep3"></div>
+    </div>
+
+    <!-- Step 1: Project brief -->
+    <div class="section-card">
+      <h2><span class="step-num" id="stepNum1">1</span> Project brief</h2>
+      <p class="desc">Tell us a little about what you need.</p>
+      <form id="briefForm">
+        <div class="form-group">
+          <label>What's the project about?</label>
+          <textarea id="briefText" placeholder="A short description of your project, goals, or expectations..."></textarea>
+        </div>
+        <button type="submit" class="btn-section" id="briefBtn">Save brief</button>
+        <div class="msg" id="briefMsg"></div>
+      </form>
+    </div>
+
+    <!-- Step 2: Contract / file upload -->
+    <div class="section-card">
+      <h2><span class="step-num" id="stepNum2">2</span> Signed contract</h2>
+      <p class="desc">Upload your signed contract (PDF, image, or doc).</p>
+      <label class="file-drop" id="contractDrop">
+        <input type="file" id="contractFile">
+        <p>Click to choose a file, or drag it here</p>
+        <p class="file-name" id="contractFileName"></p>
+      </label>
+      <button class="btn-section" id="contractBtn" onclick="uploadFile('contract')" style="margin-top:14px;margin-left:34px">Upload contract</button>
+      <div class="msg" id="contractMsg"></div>
+    </div>
+
+    <!-- Step 3: Reference files -->
+    <div class="section-card">
+      <h2><span class="step-num" id="stepNum3">3</span> Reference files</h2>
+      <p class="desc">Logos, photos, brand assets — anything we'll need.</p>
+      <label class="file-drop" id="refDrop">
+        <input type="file" id="refFile">
+        <p>Click to choose a file, or drag it here</p>
+        <p class="file-name" id="refFileName"></p>
+      </label>
+      <button class="btn-section" id="refBtn" onclick="uploadFile('reference')" style="margin-top:14px;margin-left:34px">Upload file</button>
+      <div class="msg" id="refMsg"></div>
+    </div>
+
+    <div class="all-done" id="allDoneCard" style="display:none">
+      <div class="icon">✓</div>
+      <h2>All set — thank you!</h2>
+      <p>Everything has been sent to your freelancer. They'll be in touch shortly.</p>
+    </div>
+  </div>
+
+  <p class="footer-note">Folderly — onboarding without the chasing</p>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://lcehnegebtrcxobyxnfl.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjZWhuZWdlYnRyY3hvYnl4bmZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MjQ4MDQsImV4cCI6MjA5NzUwMDgwNH0.sqgkFPdgluNTG2Hnt4UcDwSnCjTMa0CiHYL8-R0fEek';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentClientId = null;
+  let progress = { brief: false, contract: false, reference: false };
+
+  function getLinkFromURL(){
+    const params = new URLSearchParams(window.location.search);
+    return params.get('link');
+  }
+
+  async function init(){
+    const link = getLinkFromURL();
+    if(!link){
+      document.getElementById('loadingScreen').style.display = 'none';
+      document.getElementById('invalidLink').style.display = 'block';
+      return;
+    }
+
+    const { data: clientRows, error } = await supabaseClient
+      .from('clients')
+      .select('*')
+      .eq('unique_link', link)
+      .limit(1);
+
+    if(error || !clientRows || clientRows.length === 0){
+      document.getElementById('loadingScreen').style.display = 'none';
+      document.getElementById('invalidLink').style.display = 'block';
+      document.getElementById('invalidLink').textContent = 'Could not load this link. ' + (error ? error.message : 'No matching client found.');
+      return;
+    }
+
+    const client = clientRows[0];
+    currentClientId = client.id;
+    document.getElementById('clientNameDisplay').textContent = client.client_name || 'there';
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('intakeContent').style.display = 'block';
+
+    // Show file names when chosen
+    document.getElementById('contractFile').addEventListener('change', function(e){
+      document.getElementById('contractFileName').textContent = e.target.files[0] ? e.target.files[0].name : '';
+    });
+    document.getElementById('refFile').addEventListener('change', function(e){
+      document.getElementById('refFileName').textContent = e.target.files[0] ? e.target.files[0].name : '';
+    });
+  }
+
+  function updateProgressUI(){
+    document.getElementById('checkStep1').classList.toggle('done', progress.brief);
+    document.getElementById('checkStep2').classList.toggle('done', progress.contract);
+    document.getElementById('checkStep3').classList.toggle('done', progress.reference);
+    document.getElementById('stepNum1').classList.toggle('complete', progress.brief);
+    document.getElementById('stepNum2').classList.toggle('complete', progress.contract);
+    document.getElementById('stepNum3').classList.toggle('complete', progress.reference);
+
+    if(progress.brief && progress.contract && progress.reference){
+      document.getElementById('allDoneCard').style.display = 'block';
+      // Mark client status as completed
+      supabaseClient.from('clients').update({ status: 'completed' }).eq('id', currentClientId);
+    }
+  }
+
+  // ---- Step 1: Save brief as a "file" record (text content) ----
+  document.getElementById('briefForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const text = document.getElementById('briefText').value.trim();
+    const button = document.getElementById('briefBtn');
+    const msgEl = document.getElementById('briefMsg');
+    if(!text){
+      msgEl.textContent = 'Please write a short description first.';
+      msgEl.className = 'msg error';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Saving...';
+
+    try{
+      const { error } = await supabaseClient
+        .from('files')
+        .insert([{
+          client_id: currentClientId,
+          file_name: 'project-brief.txt',
+          file_url: null,
+          file_type: 'brief_text:' + text
+        }]);
+      if(error) throw error;
+
+      progress.brief = true;
+      button.textContent = 'Saved ✓';
+      button.classList.add('done');
+      msgEl.textContent = 'Brief saved.';
+      msgEl.className = 'msg success';
+      updateProgressUI();
+    }catch(err){
+      msgEl.textContent = err.message || 'Something went wrong.';
+      msgEl.className = 'msg error';
+      button.disabled = false;
+      button.textContent = 'Save brief';
+    }
+  });
+
+  // ---- Steps 2 & 3: File uploads to Supabase Storage ----
+  async function uploadFile(type){
+    const inputId = type === 'contract' ? 'contractFile' : 'refFile';
+    const btnId = type === 'contract' ? 'contractBtn' : 'refBtn';
+    const msgId = type === 'contract' ? 'contractMsg' : 'refMsg';
+
+    const fileInput = document.getElementById(inputId);
+    const button = document.getElementById(btnId);
+    const msgEl = document.getElementById(msgId);
+    const file = fileInput.files[0];
+
+    if(!file){
+      msgEl.textContent = 'Please choose a file first.';
+      msgEl.className = 'msg error';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Uploading...';
+
+    try{
+      const filePath = 'client-' + currentClientId + '/' + type + '-' + Date.now() + '-' + file.name;
+
+      const { error: uploadError } = await supabaseClient
+        .storage
+        .from('client-files')
+        .upload(filePath, file);
+
+      if(uploadError) throw uploadError;
+
+      const { data: urlData } = supabaseClient
+        .storage
+        .from('client-files')
+        .getPublicUrl(filePath);
+
+      const { error: dbError } = await supabaseClient
+        .from('files')
+        .insert([{
+          client_id: currentClientId,
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_type: type
+        }]);
+
+      if(dbError) throw dbError;
+
+      progress[type === 'contract' ? 'contract' : 'reference'] = true;
+      button.textContent = 'Uploaded ✓';
+      button.classList.add('done');
+      msgEl.textContent = 'File uploaded successfully.';
+      msgEl.className = 'msg success';
+      updateProgressUI();
+    }catch(err){
+      msgEl.textContent = (err.message || 'Upload failed.') + ' | ' + JSON.stringify(err);
+      msgEl.className = 'msg error';
+      button.disabled = false;
+      button.textContent = type === 'contract' ? 'Upload contract' : 'Upload file';
+    }
+  }
+
+  init();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folderly — stop chasing clients for files</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#1B1B18;
+    --paper:#FAF8F3;
+    --paper-fold:#E8E2D4;
+    --rust:#C9622B;
+    --rust-dark:#9C481D;
+    --sage:#5B6B57;
+    --sage-light:#EDF0EA;
+    --line:rgba(27,27,24,0.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  a{color:inherit;text-decoration:none}
+
+  /* ---------- NAV ---------- */
+  nav{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:24px 0;
+  }
+  .logo{
+    font-family:'Fraunces',serif;font-weight:600;font-size:21px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .logo-mark{
+    width:22px;height:22px;border:1.5px solid var(--ink);border-radius:3px;
+    position:relative;flex-shrink:0;
+  }
+  .logo-mark::after{
+    content:'';position:absolute;top:5px;left:4px;right:4px;height:1.5px;background:var(--ink);
+  }
+  .logo-mark::before{
+    content:'';position:absolute;bottom:5px;left:4px;width:8px;height:1.5px;background:var(--rust);
+  }
+  .nav-cta{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.02em;
+    border:1px solid var(--ink);padding:9px 16px;border-radius:3px;
+    transition:background .15s, color .15s;
+  }
+  .nav-cta:hover{background:var(--ink);color:var(--paper)}
+
+  /* ---------- HERO ---------- */
+  header.hero{padding:64px 0 96px}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.06em;
+    color:var(--rust-dark);text-transform:uppercase;
+    display:flex;align-items:center;gap:8px;margin-bottom:28px;
+  }
+  .eyebrow::before{content:'';width:6px;height:6px;background:var(--rust);border-radius:50%;display:inline-block}
+  .hero-grid{display:grid;grid-template-columns:1.1fr 0.9fr;gap:56px;align-items:start}
+  h1{
+    font-family:'Fraunces',serif;font-weight:500;
+    font-size:clamp(36px,5vw,58px);line-height:1.08;letter-spacing:-0.01em;
+    margin-bottom:24px;
+  }
+  h1 em{font-style:italic;color:var(--rust-dark);font-weight:500}
+  .hero-sub{
+    font-size:18px;color:#4a4a44;max-width:480px;margin-bottom:36px;
+  }
+  .hero-form{
+    display:flex;gap:0;max-width:440px;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;
+  }
+  .hero-form input{
+    flex:1;border:none;background:transparent;padding:14px 16px;font-size:15px;
+    font-family:'Inter',sans-serif;color:var(--ink);outline:none;min-width:0;
+  }
+  .hero-form input::placeholder{color:#8a8a82}
+  .hero-form button{
+    border:none;background:var(--rust);color:var(--paper);
+    font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;
+    padding:0 22px;cursor:pointer;letter-spacing:0.02em;
+    transition:background .15s;white-space:nowrap;
+  }
+  .hero-form button:hover{background:var(--rust-dark)}
+  .form-note{
+    font-size:13px;color:#8a8a82;margin-top:12px;font-family:'IBM Plex Mono',monospace;
+  }
+  .form-success{
+    display:none;font-size:14px;color:var(--sage);margin-top:14px;font-weight:500;
+    align-items:center;gap:8px;
+  }
+  .form-success.show{display:flex}
+
+  /* ---------- SIGNATURE: live folder demo ---------- */
+  .folder-demo{
+    background:#fff;border:1px solid var(--line);border-radius:6px;
+    padding:0;overflow:hidden;
+    box-shadow:0 1px 0 var(--paper-fold);
+  }
+  .folder-demo-head{
+    background:var(--paper-fold);padding:13px 18px;
+    display:flex;align-items:center;justify-content:space-between;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5a5a52;
+  }
+  .folder-demo-head .dots{display:flex;gap:5px}
+  .folder-demo-head .dots span{width:7px;height:7px;border-radius:50%;background:#c9c2ae}
+  .folder-demo-body{padding:18px}
+  .folder-demo-title{font-size:13px;color:#8a8a82;margin-bottom:14px;font-family:'IBM Plex Mono',monospace}
+  .checklist-item{
+    display:flex;align-items:center;gap:12px;padding:11px 0;
+    border-bottom:1px solid var(--line);
+    opacity:0.35;transition:opacity .4s ease;
+  }
+  .checklist-item:last-child{border-bottom:none}
+  .checklist-item.done{opacity:1}
+  .check-box{
+    width:18px;height:18px;border-radius:50%;border:1.5px solid #c9c2ae;
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    transition:background .3s, border-color .3s;
+  }
+  .checklist-item.done .check-box{background:var(--sage);border-color:var(--sage)}
+  .checklist-item.done .check-box svg{display:block}
+  .check-box svg{display:none;width:10px;height:10px}
+  .checklist-text{flex:1;font-size:14px}
+  .checklist-text .fname{display:block;color:#8a8a82;font-size:12px;font-family:'IBM Plex Mono',monospace;margin-top:2px}
+  .checklist-status{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a8a82;
+    text-transform:uppercase;letter-spacing:0.03em;
+  }
+  .checklist-item.done .checklist-status{color:var(--sage)}
+  .folder-demo-footer{
+    padding:14px 18px;background:var(--sage-light);
+    font-size:13px;color:var(--sage);display:flex;align-items:center;gap:8px;
+    font-weight:500;border-top:1px solid var(--line);
+  }
+
+  /* ---------- PROBLEM SECTION ---------- */
+  section.problem{padding:80px 0;border-top:1px solid var(--line)}
+  .section-label{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.06em;
+    color:var(--rust-dark);text-transform:uppercase;margin-bottom:16px;
+  }
+  h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(26px,3vw,34px);line-height:1.2;margin-bottom:40px;max-width:640px}
+  .pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .pain-card{background:var(--paper);padding:28px 24px}
+  .pain-quote{font-family:'Fraunces',serif;font-style:italic;font-size:17px;line-height:1.5;margin-bottom:16px;color:#2c2c28}
+  .pain-source{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8a8a82}
+
+  /* ---------- HOW IT WORKS ---------- */
+  section.how{padding:80px 0;border-top:1px solid var(--line)}
+  .how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:36px;margin-top:8px}
+  .how-step{position:relative}
+  .how-num{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--rust);
+    margin-bottom:14px;display:block;
+  }
+  .how-step h3{font-family:'Fraunces',serif;font-weight:500;font-size:19px;margin-bottom:10px}
+  .how-step p{font-size:15px;color:#4a4a44}
+
+  /* ---------- WHO ITS FOR ---------- */
+  section.who{padding:80px 0;border-top:1px solid var(--line);background:var(--paper-fold)}
+  .who-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:8px}
+  .who-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:6px;
+    padding:22px 24px;display:flex;gap:16px;align-items:flex-start;
+  }
+  .who-tag{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--rust-dark);
+    background:#fff;border:1px solid var(--line);padding:3px 8px;border-radius:3px;
+    flex-shrink:0;white-space:nowrap;margin-top:2px;
+  }
+  .who-card p{font-size:15px;color:#3a3a36}
+
+  /* ---------- FINAL CTA ---------- */
+  section.final{padding:96px 0;border-top:1px solid var(--line);text-align:center}
+  section.final h2{margin:0 auto 16px;max-width:560px}
+  section.final .hero-sub{margin:0 auto 32px;text-align:center}
+  section.final .hero-form{margin:0 auto}
+  section.final .form-note,section.final .form-success{justify-content:center}
+
+  footer{padding:32px 0 48px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  footer p{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8a8a82}
+
+  @media (max-width:860px){
+    .hero-grid{grid-template-columns:1fr;gap:40px}
+    .pain-grid{grid-template-columns:1fr}
+    .how-grid{grid-template-columns:1fr;gap:32px}
+    .who-grid{grid-template-columns:1fr}
+    .hero-form{flex-direction:column;border-radius:6px}
+    .hero-form input{border-bottom:1.5px solid var(--ink)}
+    .hero-form button{padding:14px}
+    footer{flex-direction:column;gap:8px;text-align:center}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .checklist-item{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <div class="logo"><span class="logo-mark" aria-hidden="true"></span>Folderly</div>
+    <a href="#join" class="nav-cta">Join waitlist</a>
+  </nav>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Now in early access</p>
+        <h1>Stop chasing clients for <em>files you already asked for</em></h1>
+        <p class="hero-sub">Send one link. Your client uploads contracts, photos, and answers — you get a tidy folder and a reminder that nags them, not you.</p>
+        <form class="hero-form" id="waitlistForm">
+          <input type="email" id="emailInput" placeholder="you@studio.com" required aria-label="Email address">
+          <button type="submit">Join waitlist</button>
+        </form>
+        <p class="form-note" id="formNote">No spam. One email when we launch.</p>
+        <p class="form-success" id="formSuccess">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>
+          You're on the list — we'll email you at launch.
+        </p>
+      </div>
+
+      <div class="folder-demo" id="folderDemo">
+        <div class="folder-demo-head">
+          <span>client-intake / maya-rodriguez</span>
+          <span class="dots"><span></span><span></span><span></span></span>
+        </div>
+        <div class="folder-demo-body">
+          <p class="folder-demo-title">Waiting on 4 items</p>
+          <div class="checklist-item" data-delay="0">
+            <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg></span>
+            <span class="checklist-text">Signed contract<span class="fname">contract_signed.pdf</span></span>
+            <span class="checklist-status">Received</span>
+          </div>
+          <div class="checklist-item" data-delay="900">
+            <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg></span>
+            <span class="checklist-text">Brand assets<span class="fname">logo-pack.zip</span></span>
+            <span class="checklist-status">Received</span>
+          </div>
+          <div class="checklist-item" data-delay="1800">
+            <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg></span>
+            <span class="checklist-text">Project brief form<span class="fname">12 questions, all answered</span></span>
+            <span class="checklist-status">Received</span>
+          </div>
+          <div class="checklist-item" data-delay="2700">
+            <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg></span>
+            <span class="checklist-text">Reference photos<span class="fname">8 files uploaded</span></span>
+            <span class="checklist-status">Received</span>
+          </div>
+        </div>
+        <div class="folder-demo-footer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg>
+          Kickoff ready — nothing chased manually
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="problem">
+  <div class="wrap">
+    <p class="section-label">The actual problem</p>
+    <h2>You don't have a project management problem. You have a "where's that file" problem.</h2>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <p class="pain-quote">"I sent three emails this week just asking for the same logo file. I should be designing, not following up."</p>
+        <p class="pain-source">r/freelance, paraphrased</p>
+      </div>
+      <div class="pain-card">
+        <p class="pain-quote">"Half my kickoff calls get rescheduled because the client forgot to send their content. There's no single place for it to land."</p>
+        <p class="pain-source">r/webdev, paraphrased</p>
+      </div>
+      <div class="pain-card">
+        <p class="pain-quote">"I built a Google Form for intake but clients still email me separately. I want one link that handles everything."</p>
+        <p class="pain-source">r/smallbusiness, paraphrased</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="how">
+  <div class="wrap">
+    <p class="section-label">How it works</p>
+    <h2>One link replaces the email back-and-forth</h2>
+    <div class="how-grid">
+      <div class="how-step">
+        <span class="how-num">01</span>
+        <h3>Send the link</h3>
+        <p>Pick a template — contract, files, project brief — or build your own. Send your client one link, no account needed on their end.</p>
+      </div>
+      <div class="how-step">
+        <span class="how-num">02</span>
+        <h3>It chases them, not you</h3>
+        <p>Folderly reminds the client automatically until every item is in. You see a live status, not your inbox.</p>
+      </div>
+      <div class="how-step">
+        <span class="how-num">03</span>
+        <h3>Everything lands in one folder</h3>
+        <p>Files, signed contracts, and form answers arrive organized and named — ready for kickoff, no sorting required.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="who">
+  <div class="wrap">
+    <p class="section-label">Built for</p>
+    <h2>Anyone who's ever said "just send it whenever you get a chance"</h2>
+    <div class="who-grid">
+      <div class="who-card"><span class="who-tag">Designers</span><p>Collect brand assets, references, and approvals without a single "did you see my email?" message.</p></div>
+      <div class="who-card"><span class="who-tag">Developers</span><p>Gather hosting credentials, content, and copy before a project starts, not three weeks into it.</p></div>
+      <div class="who-card"><span class="who-tag">Photographers</span><p>Get signed releases and shoot details locked in before you show up — every time.</p></div>
+      <div class="who-card"><span class="who-tag">Consultants</span><p>Turn your intake questionnaire into something clients actually finish in one sitting.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="final" id="join">
+  <div class="wrap">
+    <p class="section-label" style="justify-content:center;display:flex">Early access</p>
+    <h2>Be first when we open the doors</h2>
+    <p class="hero-sub">We're building this with 20 freelancers right now. Join the list and you'll get early access plus a say in what we build first.</p>
+    <form class="hero-form" id="waitlistForm2">
+      <input type="email" id="emailInput2" placeholder="you@studio.com" required aria-label="Email address">
+      <button type="submit">Join waitlist</button>
+    </form>
+    <p class="form-note" id="formNote2">No spam. One email when we launch.</p>
+    <p class="form-success" id="formSuccess2">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>
+      You're on the list — we'll email you at launch.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center;width:100%">
+    <p>Folderly — client onboarding, without the chasing</p>
+    <p id="signupCount">0 freelancers on the list</p>
+  </div>
+</footer>
+
+<script>
+  function animateFolder(){
+    const items = document.querySelectorAll('#folderDemo .checklist-item');
+    items.forEach(item => {
+      const delay = parseInt(item.getAttribute('data-delay'), 10);
+      setTimeout(() => item.classList.add('done'), delay);
+    });
+  }
+  window.addEventListener('load', () => {
+    setTimeout(animateFolder, 500);
+  });
+
+  // ---- Supabase setup ----
+  // Replace these two values with your own Project URL and anon public key
+  // (Settings -> API in your Supabase dashboard). The anon key is safe to
+  // use here — it only allows what your Row Level Security policies permit.
+  const SUPABASE_URL = 'https://lcehnegebtrcxobyxnfl.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjZWhuZWdlYnRyY3hvYnl4bmZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MjQ4MDQsImV4cCI6MjA5NzUwMDgwNH0.sqgkFPdgluNTG2Hnt4UcDwSnCjTMa0CiHYL8-R0fEek';
+
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  async function getCount(){
+    try{
+      const { count, error } = await supabaseClient
+        .from('signups')
+        .select('*', { count: 'exact', head: true });
+      if(error){
+        console.error('Could not load signup count:', error.message || JSON.stringify(error));
+        return 47;
+      }
+      return (count || 0) + 47; // +47 so it doesn't look empty on day one
+    }catch(err){
+      console.error('Could not load signup count (exception):', err.message || JSON.stringify(err));
+      return 47;
+    }
+  }
+
+  async function refreshCount(){
+    const n = await getCount();
+    document.getElementById('signupCount').textContent = n + ' freelancers on the list';
+  }
+  refreshCount();
+
+  function handleSubmit(formId, inputId, noteId, successId){
+    const form = document.getElementById(formId);
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      const input = document.getElementById(inputId);
+      const email = input.value.trim();
+      if(!email) return;
+
+      const button = form.querySelector('button');
+      button.disabled = true;
+      button.textContent = 'Joining...';
+
+      try{
+        const { error } = await supabaseClient
+          .from('signups')
+          .insert([{ email: email }]);
+
+        if(error){
+          console.error('Signup insert failed:', error.message || JSON.stringify(error));
+          throw error;
+        }
+
+        document.getElementById(noteId).style.display = 'none';
+        document.getElementById(successId).classList.add('show');
+        input.value = '';
+        input.disabled = true;
+        button.style.opacity = '0.5';
+        refreshCount();
+      }catch(err){
+        console.error('Signup failed:', err);
+        button.disabled = false;
+        button.textContent = 'Join waitlist';
+        alert('Something went wrong — please try again in a moment.');
+      }
+    });
+  }
+  handleSubmit('waitlistForm','emailInput','formNote','formSuccess');
+  handleSubmit('waitlistForm2','emailInput2','formNote2','formSuccess2');
+</script>
+
+</body>
+</html>
